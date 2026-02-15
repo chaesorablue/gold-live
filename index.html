@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>골드&실버 실시간 경제지표 (Pro Analyst)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800;900&display=swap');
+        body { font-family: 'Pretendard', sans-serif; }
+        .card-shadow { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .input-glow:focus { box-shadow: 0 0 0 4px rgba(234, 179, 8, 0.2); border-color: #eab308; }
+        .stat-card { transition: all 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
+        .animate-pulse-slow { animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        
+        /* Custom Scrollbar */
+        .chart-scroll::-webkit-scrollbar { width: 6px; }
+        .chart-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
+        
+        /* Table Styles */
+        .table-row-hover:hover { background-color: #f8fafc; }
+        th { font-weight: 800; color: #475569; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; }
+        td { font-size: 0.875rem; font-weight: 600; color: #1e293b; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 pb-20">
+
+    <!-- Header -->
+    <header class="bg-white border-b sticky top-0 z-50 shadow-sm">
+        <div class="max-w-[1400px] mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-slate-900 p-2 rounded-lg shadow-lg">
+                    <i data-lucide="layout-dashboard" class="text-yellow-400 w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-black tracking-tighter text-slate-900 leading-none">GOLD & SILVER</h1>
+                    <p class="text-[10px] text-slate-500 font-bold tracking-[0.1em] uppercase">Pro Analyst Dashboard</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-full border border-green-100">
+                <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <span class="text-xs font-bold text-green-700 uppercase tracking-wide">Market Live</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Ticker Tape -->
+    <div class="w-full bg-slate-900 overflow-hidden border-b border-slate-800 h-10">
+        <div class="tradingview-widget-container">
+            <div class="tradingview-widget-container__widget"></div>
+            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+            {
+            "symbols": [
+                { "proName": "FX_IDC:USDKRW", "title": "원달러" },
+                { "proName": "FOREXCOM:XAUUSD", "title": "국제금" },
+                { "proName": "KRX:411060", "title": "KRX금현물" }, 
+                { "proName": "FOREXCOM:XAGUSD", "title": "국제은" }
+            ],
+            "showSymbolLogo": false,
+            "colorTheme": "dark",
+            "isTransparent": true,
+            "displayMode": "adaptive",
+            "locale": "kr"
+            }
+            </script>
+        </div>
+    </div>
+
+    <main class="max-w-[1400px] mx-auto px-4 py-8 space-y-8">
+        
+        <!-- Intro -->
+        <div class="text-center space-y-3 mb-6">
+            <h2 class="text-2xl font-black text-slate-800">실시간 금 시세 분석기</h2>
+            
+            <!-- Clock Display -->
+            <div class="flex justify-center">
+                <div class="flex items-center gap-2 text-xs font-bold text-slate-500 bg-white border border-slate-200 px-4 py-1.5 rounded-full shadow-sm">
+                    <i data-lucide="clock" class="w-3.5 h-3.5 text-blue-500"></i>
+                    <span id="clockText" class="tracking-wide">Loading Time...</span>
+                </div>
+            </div>
+
+            <p class="text-sm text-slate-500 mt-1">환율은 서버에서 <span class="font-bold text-green-600">자동 수신</span>되며, 좌측 차트 가격을 입력하면 한국 시세가 계산됩니다.</p>
+        </div>
+
+        <!-- MAIN CONTROL PANEL -->
+        <div class="bg-white rounded-[2rem] card-shadow border border-slate-200 overflow-hidden">
+            <!-- Top Controls: Inputs -->
+            <div class="bg-slate-50 border-b border-slate-200 p-6 grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div>
+                    <label class="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">
+                        <i data-lucide="banknote" class="w-4 h-4 text-green-600"></i> 기준 환율 (Live Fetch)
+                    </label>
+                    <div class="relative">
+                        <input type="number" id="usdKrwInput" class="w-full bg-white border-2 border-slate-200 rounded-xl py-3 px-4 font-black text-xl text-slate-800 input-glow transition-colors pl-12" placeholder="환율 수신 중..." oninput="calculateAll()">
+                        <div class="absolute left-4 top-1/2 -translate-y-1/2 text-green-600">
+                            <i data-lucide="refresh-cw" class="w-5 h-5" id="refreshIcon"></i>
+                        </div>
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">원/$</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 mt-1 pl-1" id="exchangeRateStatus">* 실시간 환율 정보를 가져오고 있습니다.</p>
+                </div>
+                <div>
+                    <label class="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">
+                        <i data-lucide="trending-up" class="w-4 h-4 text-yellow-600"></i> 현재 국제 금값 (XAU/USD)
+                    </label>
+                    <div class="relative">
+                        <input type="number" id="goldInputUsd" placeholder="차트 가격 입력 (예: 2600)" class="w-full bg-white border-2 border-yellow-400 rounded-xl py-3 px-4 font-black text-xl text-slate-800 input-glow transition-colors" oninput="calculateAll()">
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$/oz</span>
+                    </div>
+                     <p class="text-[10px] text-slate-400 mt-1 pl-1">* 왼쪽 차트의 현재 가격을 입력하세요.</p>
+                </div>
+            </div>
+
+            <!-- Content Split View -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 min-h-[900px]">
+                
+                <!-- LEFT (1/3): TradingView Chart (Monthly Candle) -->
+                <div class="lg:col-span-1 border-r border-slate-200 bg-slate-50 flex flex-col h-[900px]">
+                    <div class="p-4 border-b border-slate-200 bg-white">
+                        <h3 class="font-black text-slate-800 flex items-center gap-2 text-sm">
+                            <span class="w-2 h-2 bg-red-500 rounded-full animate-pulse-slow"></span> 국제 금 시세 (월봉 차트)
+                        </h3>
+                    </div>
+                    <div class="flex-1 relative">
+                        <!-- TradingView Widget: Symbol Overview -->
+                        <div class="tradingview-widget-container" style="height:100%;width:100%">
+                            <div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>
+                            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-symbol-overview.js" async>
+                            {
+                            "symbols": [
+                                [
+                                "국제 금 (월봉)",
+                                "FOREXCOM:XAUUSD|1M"
+                                ]
+                            ],
+                            "chartOnly": false,
+                            "width": "100%",
+                            "height": "100%",
+                            "locale": "kr",
+                            "colorTheme": "light",
+                            "autosize": true,
+                            "showVolume": false,
+                            "showMA": false,
+                            "hideDateRanges": false,
+                            "hideMarketStatus": false,
+                            "hideSymbolLogo": false,
+                            "scalePosition": "right",
+                            "scaleMode": "Normal",
+                            "fontFamily": "Pretendard, sans-serif",
+                            "fontSize": "10",
+                            "noTimeScale": false,
+                            "valuesTracking": "1",
+                            "changeMode": "price-and-percent",
+                            "chartType": "candlesticks",
+                            "downColor": "#f7525f",
+                            "upColor": "#22ab94",
+                            "borderUpColor": "#22ab94",
+                            "borderDownColor": "#f7525f",
+                            "wickUpColor": "#22ab94",
+                            "wickDownColor": "#f7525f"
+                            }
+                            </script>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT (2/3): Price Grid & Table -->
+                <div class="lg:col-span-2 flex flex-col h-[900px] overflow-y-auto chart-scroll">
+                    
+                    <!-- Calculator Section -->
+                    <div class="p-6 bg-white relative overflow-hidden shrink-0">
+                        <!-- Choice 1. App Structure Plan: The right side is divided into Calculator, Static History Table, and Personal Ledger for a comprehensive analytical view. -->
+                        <div class="absolute top-0 right-0 p-10 opacity-[0.03] pointer-events-none">
+                            <i data-lucide="gem" class="w-64 h-64"></i>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 content-center">
+                            
+                            <!-- 1. Basic Unit Prices -->
+                            <div class="col-span-1 md:col-span-2 grid grid-cols-2 gap-4">
+                                <div class="bg-slate-50 p-5 rounded-2xl border border-slate-100 stat-card">
+                                    <p class="text-xs text-slate-400 font-bold uppercase mb-1">순금 1그램 (1g)</p>
+                                    <div class="flex items-baseline gap-1">
+                                        <span id="goldGramPrice" class="text-2xl font-black text-slate-800">0</span>
+                                        <span class="text-sm font-bold text-slate-500">원</span>
+                                    </div>
+                                </div>
+                                <div class="bg-yellow-50 p-5 rounded-2xl border border-yellow-100 stat-card relative overflow-hidden">
+                                    <div class="absolute -right-2 -top-2 opacity-10 text-yellow-600">
+                                        <i data-lucide="coins" class="w-16 h-16"></i>
+                                    </div>
+                                    <p class="text-xs text-yellow-600 font-bold uppercase mb-1">순금 1돈 (3.75g) 기준</p>
+                                    <div class="flex items-baseline gap-1">
+                                        <span id="goldDonPrice" class="text-3xl font-black text-yellow-700">0</span>
+                                        <span class="text-sm font-bold text-yellow-600">원</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2. Buying Price -->
+                            <div class="bg-red-50 p-6 rounded-3xl border border-red-100 stat-card flex flex-col justify-between">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div>
+                                        <p class="text-xs font-black text-red-400 uppercase tracking-widest mb-1">내가 살 때 (Buying)</p>
+                                        <p class="text-[10px] text-red-300">VAT 10% + 공임비 포함 예상</p>
+                                    </div>
+                                    <div class="bg-white p-2 rounded-xl shadow-sm">
+                                        <i data-lucide="shopping-bag" class="w-6 h-6 text-red-500"></i>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span id="goldBuyPrice" class="text-4xl font-black text-red-600 tracking-tight">0</span>
+                                    <span class="text-lg font-bold text-red-400">원</span>
+                                </div>
+                            </div>
+
+                            <!-- 3. Selling Price -->
+                            <div class="bg-blue-50 p-6 rounded-3xl border border-blue-100 stat-card flex flex-col justify-between">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div>
+                                        <p class="text-xs font-black text-blue-400 uppercase tracking-widest mb-1">내가 팔 때 (Selling)</p>
+                                        <p class="text-[10px] text-blue-300">금은방 매입 시세 (95% 기준)</p>
+                                    </div>
+                                    <div class="bg-white p-2 rounded-xl shadow-sm">
+                                        <i data-lucide="piggy-bank" class="w-6 h-6 text-blue-500"></i>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <span id="goldSellPrice" class="text-4xl font-black text-blue-600 tracking-tight">0</span>
+                                    <span class="text-lg font-bold text-blue-400">원</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="h-4 bg-slate-50 border-y border-slate-200 shrink-0"></div>
+
+                    <!-- STATIC HISTORY TABLE SECTION -->
+                    <!-- Choice 2. Content Choice: Displaying a static table representing recent market data (Feb 2026) to provide context on actual trading prices. -->
+                    <div class="flex-1 bg-white relative p-6 border-b border-slate-200">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="list" class="w-5 h-5 text-slate-700"></i>
+                                <h3 class="font-black text-slate-800 text-lg">국내 금 시세표 (최근 실적)</h3>
+                            </div>
+                            <span class="text-[10px] text-slate-400 flex items-center">* 2026년 2월 기준 샘플 데이터</span>
+                        </div>
+
+                        <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                            <table class="w-full text-center">
+                                <thead class="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th class="py-3 px-4 text-left" rowspan="2">고시날짜</th>
+                                        <th class="py-3 px-4 border-l border-slate-200 bg-red-50/50 text-red-600" rowspan="2">살 때 (3.75g)<br><span class="text-[10px] text-red-400">순금(24K)</span></th>
+                                        <th class="py-3 px-4 border-l border-slate-200 bg-blue-50/50 text-blue-600" colspan="3">팔 때 (3.75g)</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="py-2 px-2 border-l border-slate-200 border-t bg-blue-50/50 text-blue-500">순금(24K)</th>
+                                        <th class="py-2 px-2 border-l border-slate-200 border-t bg-blue-50/50 text-blue-500">18K</th>
+                                        <th class="py-2 px-2 border-l border-slate-200 border-t bg-blue-50/50 text-blue-500">14K</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-sm">
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="py-3 px-4 text-left font-bold text-slate-600">2026.02.14</td>
+                                        <td class="py-3 px-4 text-red-600 font-black border-l border-slate-100">1,024,000</td>
+                                        <td class="py-3 px-4 text-blue-600 font-bold border-l border-slate-100">844,000</td>
+                                        <td class="py-3 px-4 text-slate-600 border-l border-slate-100">620,400</td>
+                                        <td class="py-3 px-4 text-slate-500 border-l border-slate-100">481,100</td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="py-3 px-4 text-left font-bold text-slate-600">2026.02.13</td>
+                                        <td class="py-3 px-4 text-red-600 font-black border-l border-slate-100">1,014,000</td>
+                                        <td class="py-3 px-4 text-blue-600 font-bold border-l border-slate-100">841,000</td>
+                                        <td class="py-3 px-4 text-slate-600 border-l border-slate-100">618,200</td>
+                                        <td class="py-3 px-4 text-slate-500 border-l border-slate-100">479,400</td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="py-3 px-4 text-left font-bold text-slate-600">2026.02.12</td>
+                                        <td class="py-3 px-4 text-red-600 font-black border-l border-slate-100">1,033,000</td>
+                                        <td class="py-3 px-4 text-blue-600 font-bold border-l border-slate-100">857,000</td>
+                                        <td class="py-3 px-4 text-slate-600 border-l border-slate-100">629,900</td>
+                                        <td class="py-3 px-4 text-slate-500 border-l border-slate-100">488,500</td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="py-3 px-4 text-left font-bold text-slate-600">2026.02.11</td>
+                                        <td class="py-3 px-4 text-red-600 font-black border-l border-slate-100">1,037,000</td>
+                                        <td class="py-3 px-4 text-blue-600 font-bold border-l border-slate-100">857,000</td>
+                                        <td class="py-3 px-4 text-slate-600 border-l border-slate-100">629,900</td>
+                                        <td class="py-3 px-4 text-slate-500 border-l border-slate-100">488,500</td>
+                                    </tr>
+                                    <tr class="table-row-hover transition-colors">
+                                        <td class="py-3 px-4 text-left font-bold text-slate-600">2026.02.10</td>
+                                        <td class="py-3 px-4 text-red-600 font-black border-l border-slate-100">1,036,000</td>
+                                        <td class="py-3 px-4 text-blue-600 font-bold border-l border-slate-100">860,000</td>
+                                        <td class="py-3 px-4 text-slate-600 border-l border-slate-100">632,100</td>
+                                        <td class="py-3 px-4 text-slate-500 border-l border-slate-100">490,200</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- MY LEDGER SECTION -->
+                    <!-- Choice 3. Interaction Choice: Providing a manual entry form and local storage to allow users to build their own persistent price history. -->
+                    <div class="flex-1 bg-white relative p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="book-open" class="w-5 h-5 text-slate-700"></i>
+                                <h3 class="font-black text-slate-800 text-lg">나만의 시세 장부 (My Ledger)</h3>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="resetData()" class="text-xs text-slate-400 underline hover:text-red-500">초기화</button>
+                            </div>
+                        </div>
+
+                        <!-- Input Form -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6">
+                            <p class="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">오늘의 시세 기록하기</p>
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+                                <input type="date" id="inputDate" class="bg-white border border-slate-300 rounded-lg px-2 py-2 text-xs font-bold text-center focus:border-yellow-500 focus:outline-none">
+                                <input type="number" id="inputBuy24k" placeholder="살때(24K)" class="bg-white border border-red-200 rounded-lg px-2 py-2 text-xs text-center focus:border-red-500 focus:outline-none placeholder:text-red-200">
+                                <input type="number" id="inputSell24k" placeholder="팔때(24K)" class="bg-white border border-blue-200 rounded-lg px-2 py-2 text-xs text-center focus:border-blue-500 focus:outline-none placeholder:text-blue-200">
+                                <input type="number" id="inputSell18k" placeholder="팔때(18K)" class="bg-white border border-blue-200 rounded-lg px-2 py-2 text-xs text-center focus:border-blue-500 focus:outline-none placeholder:text-blue-200">
+                                <button onclick="addPriceRow()" class="bg-slate-800 text-white rounded-lg px-2 py-2 text-xs font-bold hover:bg-slate-700 transition-colors col-span-2 md:col-span-1">
+                                    + 기록 추가
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- User Data Table -->
+                        <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                            <table class="w-full text-center">
+                                <thead class="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th class="py-3 px-4 text-left" rowspan="2">날짜</th>
+                                        <th class="py-3 px-4 border-l border-slate-200 bg-red-50/50 text-red-600" rowspan="2">살 때 (3.75g)</th>
+                                        <th class="py-3 px-4 border-l border-slate-200 bg-blue-50/50 text-blue-600" colspan="3">팔 때 (3.75g)</th>
+                                    </tr>
+                                    <tr>
+                                        <th class="py-2 px-2 border-l border-slate-200 border-t bg-blue-50/50 text-blue-500">24K</th>
+                                        <th class="py-2 px-2 border-l border-slate-200 border-t bg-blue-50/50 text-blue-500">18K</th>
+                                        <th class="py-2 px-2 border-l border-slate-200 border-t bg-blue-50/50 text-blue-500">14K</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="priceTableBody" class="divide-y divide-slate-100 text-sm">
+                                    <!-- Rows populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coupang Ad -->
+        <div class="pt-12 pb-4 text-center flex flex-col items-center">
+            <p class="text-[9px] text-slate-400 mb-4 font-black tracking-widest uppercase">Recommendation</p>
+            
+            <!-- User Provided Iframe -->
+            <div class="rounded-xl overflow-hidden shadow-lg border border-slate-100 bg-white p-4">
+                <iframe src="https://coupa.ng/clDpD9" width="120" height="240" frameborder="0" scrolling="no" referrerpolicy="unsafe-url" browsingtopics></iframe>
+            </div>
+            
+            <!-- Disclaimer -->
+            <p class="text-[10px] text-slate-400 mt-4 leading-relaxed">
+                이 포스팅은 쿠팡 파트너스 활동의 일환으로,<br>이에 따른 일정액의 수수료를 제공받습니다.
+            </p>
+        </div>
+
+    </main>
+
+    <footer class="text-center pb-12 pt-6 border-t border-slate-200 mt-12 bg-slate-50">
+        <p class="text-[10px] text-slate-400 font-bold mb-2 uppercase tracking-wide">&copy; 2026 Gold Monitor Pro</p>
+        <a href="mailto:chaesorablue@gmail.com" class="text-xs font-black text-orange-500 hover:text-orange-600 transition-colors">
+            chaesorablue@gmail.com
+        </a>
+        <p class="text-[9px] text-slate-300 mt-2">Prices are estimates based on international spot rates.</p>
+    </footer>
+
+    <script>
+        const OZ_TO_GRAM = 31.1034768;
+        const DON_TO_GRAM = 3.75;
+        
+        // Ledger Logic
+        function getTableData() {
+            const saved = localStorage.getItem('goldLedger');
+            return saved ? JSON.parse(saved) : []; // Default empty for user ledger
+        }
+
+        function saveTableData(data) {
+            localStorage.setItem('goldLedger', JSON.stringify(data));
+            renderTable();
+        }
+
+        function addPriceRow() {
+            const date = document.getElementById('inputDate').value.replace(/-/g, '.');
+            const buy24 = parseInt(document.getElementById('inputBuy24k').value);
+            const sell24 = parseInt(document.getElementById('inputSell24k').value);
+            const sell18 = parseInt(document.getElementById('inputSell18k').value);
+            // Auto calc 14k roughly if empty
+            const sell14 = sell18 ? Math.round(sell18 * 0.77) : 0; 
+
+            if (!date || isNaN(buy24) || isNaN(sell24)) {
+                alert("날짜와 24K 가격을 정확히 입력해주세요.");
+                return;
+            }
+
+            const newData = { date, buy24, sell24, sell18: sell18 || 0, sell14 };
+            const currentData = getTableData();
+            
+            // Add to top
+            currentData.unshift(newData);
+            saveTableData(currentData);
+            
+            // Clear inputs
+            document.getElementById('inputBuy24k').value = '';
+            document.getElementById('inputSell24k').value = '';
+            document.getElementById('inputSell18k').value = '';
+        }
+
+        function resetData() {
+            if(confirm("기록된 모든 장부 데이터를 삭제하시겠습니까?")) {
+                localStorage.removeItem('goldLedger');
+                renderTable();
+            }
+        }
+
+        function format(num) {
+            return Math.round(num).toLocaleString('ko-KR');
+        }
+
+        function renderTable() {
+            const data = getTableData();
+            const tbody = document.getElementById('priceTableBody');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-xs text-slate-400 italic">아직 기록된 시세가 없습니다. 위에서 데이터를 추가해보세요.</td></tr>';
+                return;
+            }
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "table-row-hover transition-colors";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 text-left font-bold text-slate-600">${row.date}</td>
+                    <td class="py-3 px-4 text-red-600 font-black border-l border-slate-100">${format(row.buy24)}</td>
+                    <td class="py-3 px-4 text-blue-600 font-bold border-l border-slate-100">${format(row.sell24)}</td>
+                    <td class="py-3 px-4 text-slate-600 border-l border-slate-100">${row.sell18 ? format(row.sell18) : '-'}</td>
+                    <td class="py-3 px-4 text-slate-500 border-l border-slate-100">${row.sell14 ? format(row.sell14) : '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Live Exchange Rate Logic
+        async function fetchExchangeRate() {
+            const input = document.getElementById('usdKrwInput');
+            const refreshIcon = document.getElementById('refreshIcon');
+            const statusText = document.getElementById('exchangeRateStatus');
+            
+            refreshIcon.classList.add('animate-spin');
+            
+            try {
+                const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+                const data = await response.json();
+                
+                if (data && data.rates && data.rates.KRW) {
+                    const rate = data.rates.KRW.toFixed(2);
+                    input.value = rate;
+                    statusText.innerText = `* 실시간 환율 적용됨 (1$ = ${rate}원)`;
+                    statusText.classList.add('text-green-600');
+                    calculateAll(); 
+                } else {
+                    throw new Error('No KRW data');
+                }
+            } catch (error) {
+                console.error('환율 로드 실패:', error);
+                statusText.innerText = '* 환율 자동 수신 실패 (기본값 사용)';
+                statusText.classList.add('text-red-500');
+                if (!input.value) input.value = 1430; 
+            } finally {
+                refreshIcon.classList.remove('animate-spin');
+            }
+        }
+
+        function calculateAll() {
+            const exchangeRate = parseFloat(document.getElementById('usdKrwInput').value) || 0;
+            const goldOz = parseFloat(document.getElementById('goldInputUsd').value) || 0;
+            
+            if(goldOz > 0 && exchangeRate > 0) {
+                const gGramRaw = (goldOz / OZ_TO_GRAM) * exchangeRate;
+                const gDonRaw = gGramRaw * DON_TO_GRAM;
+                
+                document.getElementById('goldGramPrice').innerText = format(gGramRaw);
+                document.getElementById('goldDonPrice').innerText = format(gDonRaw);
+                document.getElementById('goldBuyPrice').innerText = format(gDonRaw * 1.15);
+                document.getElementById('goldSellPrice').innerText = format(gDonRaw * 0.95);
+            } else {
+                document.getElementById('goldGramPrice').innerText = "0";
+                document.getElementById('goldDonPrice').innerText = "0";
+                document.getElementById('goldBuyPrice').innerText = "0";
+                document.getElementById('goldSellPrice').innerText = "0";
+            }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
+            const timeStr = now.toLocaleTimeString('ko-KR', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const clockEl = document.getElementById('clockText');
+            if(clockEl) clockEl.innerText = `${dateStr} ${timeStr}`;
+            
+            const today = now.toISOString().split('T')[0];
+            const dateInput = document.getElementById('inputDate');
+            if(dateInput && !dateInput.value) dateInput.value = today;
+        }
+
+        window.onload = () => {
+            lucide.createIcons();
+            fetchExchangeRate();
+            updateClock();
+            setInterval(updateClock, 1000);
+            renderTable();
+        };
+    </script>
+</body>
+</html>
